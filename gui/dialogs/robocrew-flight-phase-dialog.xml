@@ -1,0 +1,137 @@
+<?xml version="1.0"?>
+<PropertyList>
+    <name>robocrew-flight-phase-dialog</name>
+    <pref-width>600</pref-width>
+    <layout>vbox</layout>
+
+    <nasal>
+        <open>
+          var dlg = cmdarg();
+          var crewProp = props.globals.getNode('/robocrew/crew');
+          foreach (var crewMember; crewProp.getChildren()) {
+            dlg.addChild('hrule');
+            var myGroup = dlg.addChild('group');
+            myGroup.setValue('layout', 'hbox');
+            myGroup.addChild('empty').setValue('stretch', '1');
+            myGroup.addChild('text').setValue('label', crewMember.getValue('name'));
+            myGroup.addChild('empty').setValue('stretch', '1');
+            var controls = crewMember.getChildren('control');
+            foreach (var control; controls) {
+                var ty = control.getValue('type');
+                var name = control.getValue('name');
+                var input = control.getNode('input');
+                var status = control.getNode('status');
+                var controlGroup = dlg.addChild('group');
+                controlGroup.setValue('layout', 'hbox');
+                if (ty == 'checkbox') {
+                    var cb = controlGroup.addChild('checkbox');
+                    cb.setValue('halign', 'left');
+                    cb.setValue('label', name);
+                    cb.setValue('live', 1);
+                    cb.setValue('pref-width', 100);
+                    cb.setValue('property', input.getPath());
+                    cb.addChild('binding').setValue('command', 'dialog-apply');
+                    if (status != nil) {
+                        var statusText = controlGroup.addChild('text');
+                        statusText.setValue('live', 1);
+                        statusText.setValue('pref-width', 500);
+                        statusText.setValue('halign', 'left');
+                        statusText.setValue('property', status.getPath());
+                    }
+                }
+            }
+          }
+        </open>
+    </nasal>
+
+    <group>
+        <layout>hbox</layout>
+        <empty>
+            <stretch>1</stretch>
+        </empty>
+
+        <text>
+            <label>Robo Crew</label>
+        </text>
+
+        <empty>
+            <stretch>1</stretch>
+        </empty>
+
+        <button>
+            <pref-width>16</pref-width>
+            <pref-height>16</pref-height>
+            <legend></legend>
+            <keynum>27</keynum>
+            <border>2</border>
+            <binding>
+                <command>dialog-close</command>
+            </binding>
+        </button>
+    </group>
+
+    <hrule/>
+
+    <group>
+        <layout>hbox</layout>
+        <empty>
+            <stretch>1</stretch>
+        </empty>
+
+        <text>
+            <label>Flight Phase</label>
+        </text>
+
+        <empty>
+            <stretch>1</stretch>
+        </empty>
+    </group>
+
+    <group>
+        <layout>hbox</layout>
+        <button>
+            <legend>OFF</legend>
+            <pref-width>80</pref-width>
+            <binding>
+                <command>property-assign</command>
+                <property>/robocrew/common/flight-phase</property>
+                <value>OFF</value>
+            </binding>
+        </button>
+        <combo>
+            <pref-width>200</pref-width>
+            <live type="bool">true</live>
+            <property>/robocrew/common/flight-phase</property>
+            <value>OFF</value>
+            <value>PREFLIGHT</value>
+            <value>TAKEOFF</value>
+            <value>CLIMB</value>
+            <value>CRUISE</value>
+            <value>DESCENT</value>
+            <value>APPROACH</value>
+            <value>LANDING</value>
+            <value>TAXI-IN</value>
+            <value>SHUTDOWN</value>
+            <binding>
+                <command>dialog-apply</command>
+            </binding>
+        </combo>
+        <button>
+            <legend>Next</legend>
+            <pref-width>80</pref-width>
+            <binding>
+                <command>property-cycle</command>
+                <property>/robocrew/common/flight-phase</property>
+                <value>PREFLIGHT</value>
+                <value>TAKEOFF</value>
+                <value>CLIMB</value>
+                <value>CRUISE</value>
+                <value>DESCENT</value>
+                <value>APPROACH</value>
+                <value>LANDING</value>
+                <value>TAXI-IN</value>
+                <value>SHUTDOWN</value>
+            </binding>
+        </button>
+    </group>
+</PropertyList>
