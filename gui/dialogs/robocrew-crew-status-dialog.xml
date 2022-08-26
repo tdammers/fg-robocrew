@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <PropertyList>
-    <name>robocrew-flight-phase-dialog</name>
-    <pref-width>600</pref-width>
+    <name>robocrew-crew-status-dialog</name>
+    <pref-width>700</pref-width>
     <layout>vbox</layout>
 
     <nasal>
@@ -28,7 +28,7 @@
                     cb.setValue('halign', 'left');
                     cb.setValue('label', name);
                     cb.setValue('live', 1);
-                    cb.setValue('pref-width', 100);
+                    cb.setValue('pref-width', 200);
                     cb.setValue('property', input.getPath());
                     cb.addChild('binding').setValue('command', 'dialog-apply');
                     if (status != nil) {
@@ -104,6 +104,7 @@
             <property>/robocrew/common/flight-phase</property>
             <value>OFF</value>
             <value>PREFLIGHT</value>
+            <value>TAXI-OUT</value>
             <value>TAKEOFF</value>
             <value>CLIMB</value>
             <value>CRUISE</value>
@@ -123,6 +124,7 @@
                 <command>property-cycle</command>
                 <property>/robocrew/common/flight-phase</property>
                 <value>PREFLIGHT</value>
+                <value>TAXI-OUT</value>
                 <value>TAKEOFF</value>
                 <value>CLIMB</value>
                 <value>CRUISE</value>

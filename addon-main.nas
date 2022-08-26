@@ -1,5 +1,18 @@
 var fgHome = getprop("/sim/fg-home");
 
+globals.propify = func (prop, create=0) {
+    if (typeof(prop) == 'scalar') {
+        var myprop = props.globals.getNode(prop, create);
+        if (myprop == nil) {
+            print('Warning: requested property ' ~ prop ~ ' does not exist');
+        }
+        return myprop;
+    }
+    else {
+        return prop;
+    }
+};
+
 var rcprops = {
     flightPhase: props.globals.getNode('/robocrew/common/flight-phase', 1),
     crew: props.globals.getNode('/robocrew/crew', 1),
@@ -7,6 +20,15 @@ var rcprops = {
 
 globals.robocrew = {};
 globals.robocrew.rcprops = rcprops;
+
+var load_module = func (module) {
+    var dirname = io.dirname(caller()[2]);
+    io.load_nasal(dirname ~ '/' ~ module, 'robocrew');
+};
+
+load_module('worker.nas');
+load_module('crew.nas');
+load_module('job.nas');
 
 if (!rcprops.flightPhase.getValue()) {
     rcprops.flightPhase.setValue('OFF');
@@ -60,5 +82,5 @@ var unload = func (addon) {
 };
 
 var main = func (addon) {
-    load_crew(subtype) or load_crew(type) or load_crew(family) or load_crew('test');
+    load_crew(subtype) or load_crew(type) or load_crew(family);
 };

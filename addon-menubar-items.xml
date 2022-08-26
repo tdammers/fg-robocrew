@@ -17,10 +17,10 @@
             </item>
             <item>
                 <enabled type="bool">true</enabled>
-                <label>Flight Phase</label>
+                <label>Crew Status</label>
                 <binding>
                     <command>dialog-show</command>
-                    <dialog-name>robocrew-flight-phase-dialog</dialog-name>
+                    <dialog-name>robocrew-crew-status-dialog</dialog-name>
                 </binding>
             </item>
         </menu>
