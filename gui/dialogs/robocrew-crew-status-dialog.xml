@@ -7,10 +7,20 @@
     <nasal>
         <open>
           var dlg = cmdarg();
+          var groups = dlg.getChildren('group');
+          var dyngrp = nil;
+          foreach (var g; groups) {
+            if (g.getValue('name') == 'dynamic') {
+              dyngrp = g;
+              break;
+            }
+          }
+          dyngrp.removeChildren('group');
+          dyngrp.removeChildren('hrule');
           var crewProp = props.globals.getNode('/robocrew/crew');
           foreach (var crewMember; crewProp.getChildren()) {
-            dlg.addChild('hrule');
-            var myGroup = dlg.addChild('group');
+            dyngrp.addChild('hrule');
+            var myGroup = dyngrp.addChild('group');
             myGroup.setValue('layout', 'hbox');
             myGroup.addChild('empty').setValue('stretch', '1');
             myGroup.addChild('text').setValue('label', crewMember.getValue('name'));
@@ -21,7 +31,7 @@
                 var name = control.getValue('name');
                 var input = control.getNode('input');
                 var status = control.getNode('status');
-                var controlGroup = dlg.addChild('group');
+                var controlGroup = dyngrp.addChild('group');
                 controlGroup.setValue('layout', 'hbox');
                 if (ty == 'checkbox') {
                     var cb = controlGroup.addChild('checkbox');
@@ -140,5 +150,10 @@
             </binding>
             -->
         </button>
+    </group>
+
+    <group>
+        <name>dynamic</name>
+        <layout>vbox</layout>
     </group>
 </PropertyList>
