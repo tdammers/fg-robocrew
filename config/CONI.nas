@@ -434,11 +434,147 @@ var FlightEngineerMasterJob = {
     },
 };
 
+var AutoFlightPhaseJob = {
+    new: func (crew) {
+        var m = BaseJob.new(rcprops.autoFlightPhase);
+        m.parents = [AutoFlightPhaseJob] ~ m.parents;
+
+        m.props = {};
+        m.props.engineRunning = [];
+        m.props.throttle = [];
+        m.props.reverser = [];
+        for (var e = 0; e < 4; e += 1) {
+            append(m.props.engineRunning, props.globals.getNode('/engines/engine[' ~ e ~ ']/running'));
+            append(m.props.throttle, props.globals.getNode('/controls/engines/engine[' ~ e ~ ']/throttle'));
+            append(m.props.reverser, props.globals.getNode('/controls/engines/engine[' ~ e ~ ']/reverser'));
+        }
+        m.props.agl = props.globals.getNode('position/altitude-agl-ft');
+        m.props.airspeed = props.globals.getNode('instrumentation/airspeed-indicator/indicated-speed-kt');
+        m.props.groundspeed = props.globals.getNode('velocities/groundspeed-kt');
+        m.props.flaps = props.globals.getNode('controls/flight/flaps');
+        m.props.cruiseAlt = props.globals.getNode('autopilot/route-manager/cruise/altitude-ft');
+        m.props.cruiseSpeed = props.globals.getNode('autopilot/route-manager/cruise/speed-kts');
+        m.props.destination = props.globals.getNode('autopilot/route-manager/destination/runway');
+        m.props.distanceRemaining = props.globals.getNode('autopilot/route-manager/distance-remaining-nm');
+        m.props.vspeed = props.globals.getNode('instrumentation/vertical-speed-indicator/indicated-speed-fpm');
+
+        return m;
+    },
+
+    update: func (dt) {
+        var phase = rcprops.flightPhase.getValue();
+        var nextPhase = me.nextPhase(phase);
+        if (nextPhase != nil)
+            robocrew.crew.setFlightPhase(nextPhase);
+    },
+
+    nextPhase: func(phase) {
+        if (phase == 'OFF') {
+            return nil; # Never auto-advance from OFF
+        }
+        elsif (phase == 'PREFLIGHT') {
+            # PREFLIGHT becomes TAXI-OUT when all engines are running
+            var allEnginesRunning = 1;
+            foreach (var erp; me.props.engineRunning) {
+                if (!erp.getBoolValue()) {
+                    allEnginesRunning = 0;
+                    break;
+                }
+            }
+            if (allEnginesRunning)
+                return 'TAXI-OUT';
+            else
+                return nil;
+        }
+        elsif (phase == 'TAXI-OUT') {
+            return nil; # Initiating takeoff is always manual
+        }
+        elsif (phase == 'TAKEOFF') {
+            # Transition from TAKEOFF to CLIMB when at safe altitude,
+            # sufficient airspeed, and flaps up
+            if (me.props.agl.getValue() > 800
+                and me.props.airspeed.getValue() > 180
+                and me.props.flaps.getValue() < 0.125)
+                return 'CLIMB';
+        }
+        elsif (phase == 'CLIMB') {
+            # Transition from CLIMB to CRUISE when:
+            # - cruise altitude configured and reached
+            # - levelled off
+            # - cruise speed reached
+            var alt = me.props.agl.getValue();
+            var airspeed = me.props.airspeed.getValue();
+            var cruiseAlt = me.props.cruiseAlt.getValue();
+            var cruiseSpeed = me.props.cruiseSpeed.getValue() or 210;
+            var vspeed = me.props.vspeed.getValue() or 0;
+            if (!cruiseAlt) return nil; # Cruise altitude not configured
+            if (alt >= cruiseAlt - 100
+                and airspeed >= cruiseSpeed - 5
+                and vspeed < 100)
+                return 'CRUISE';
+            else
+                return nil;
+        }
+        elsif (phase == 'CRUISE') {
+            # Transition from CRUISE to DESCENT to be performed manually
+            return nil;
+        }
+        elsif (phase == 'DESCENT') {
+            # DESCENT -> APPROACH:
+            # - flaps set to APPR
+            # OR:
+            # - destination runway configured
+            # - within 10 miles from touchdown
+            if (me.props.flaps.getValue() >= 0.375) return 'APPROACH';
+            if (me.props.destination.getValue() == '') return nil;
+            if (me.props.distanceRemaining.getValue() < 10) return 'APPROACH';
+            return nil;
+        }
+        elsif (phase == 'APPROACH') {
+            # APPROACH -> LANDING:
+            # - Landing flaps set
+            # OR
+            # - Below 500 ft AGL
+            if (me.props.flaps.getValue() >= 0.875 or
+                me.props.agl.getValue() < 500)
+                return 'LANDING';
+            else
+                return nil;
+        }
+        elsif (phase == 'LANDING') {
+            # Check for go-around
+            var allEnginesTOGA = 1;
+            for (var e = 0; e < 4; e += 1) {
+                if (me.props.throttle[e].getValue() < 0.9 or
+                    me.props.reverser[e].getBoolValue()) {
+                    allEnginesTOGA = 0;
+                    break;
+                }
+            }
+            if (allEnginesTOGA)
+                return 'TAKEOFF';
+            if (me.props.groundspeed.getValue() < 40)
+                return 'TAXI-OUT';
+            return nil;
+        }
+        else {
+            return nil;
+        }
+    },
+};
+
 var makeFlightEngineer = func {
     var worker = Worker.new();
     worker.addJob(FlightEngineerMasterJob.new(worker));
     return worker;
 };
 
+var makeAutoFlightPhaseWorker = func {
+    var worker = Worker.new();
+    worker.addJob(AutoFlightPhaseJob.new(worker));
+    return worker;
+};
+
 var crew = Crew.new();
 crew.addWorker(makeFlightEngineer());
+crew.addWorker(makeAutoFlightPhaseWorker());

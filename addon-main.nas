@@ -15,11 +15,21 @@ globals.propify = func (prop, create=0) {
 
 var rcprops = {
     flightPhase: props.globals.getNode('/robocrew/common/flight-phase', 1),
+    flightPhases: props.globals.getNode('/robocrew/common/flight-phases', 1),
+    autoFlightPhase: props.globals.getNode('/robocrew/common/auto-flight-phase', 1),
     crew: props.globals.getNode('/robocrew/crew', 1),
 };
 
 globals.robocrew = {};
 globals.robocrew.rcprops = rcprops;
+globals.robocrew.updateFlightPhases = func (flightPhases) {
+    rcprops.flightPhases.removeAllChildren();
+    foreach (var phase; flightPhases) {
+        rcprops.flightPhases.addChild('value').setValue(phase);
+    }
+};
+
+globals.robocrew.updateFlightPhases(['OFF']);
 
 var load_module = func (module) {
     var dirname = io.dirname(caller()[2]);

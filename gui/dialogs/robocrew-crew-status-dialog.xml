@@ -99,27 +99,31 @@
             </binding>
         </button>
         <combo>
-            <pref-width>200</pref-width>
+            <pref-width>250</pref-width>
             <live type="bool">true</live>
             <property>/robocrew/common/flight-phase</property>
-            <value>OFF</value>
-            <value>PREFLIGHT</value>
-            <value>TAXI-OUT</value>
-            <value>TAKEOFF</value>
-            <value>CLIMB</value>
-            <value>CRUISE</value>
-            <value>DESCENT</value>
-            <value>APPROACH</value>
-            <value>LANDING</value>
-            <value>TAXI-IN</value>
-            <value>SHUTDOWN</value>
+            <properties>/robocrew/common/flight-phases</properties>
             <binding>
                 <command>dialog-apply</command>
             </binding>
         </combo>
+        <checkbox>
+            <label>AUTO</label>
+            <pref-width>80</pref-width>
+            <property>/robocrew/common/auto-flight-phase</property>
+
+            <binding>
+                <command>dialog-apply</command>
+            </binding>
+        </checkbox>
         <button>
             <legend>Next</legend>
             <pref-width>80</pref-width>
+            <binding>
+                <command>nasal</command>
+                <script>robocrew.crew.setNextFlightPhase();</script>
+            </binding>
+            <!--
             <binding>
                 <command>property-cycle</command>
                 <property>/robocrew/common/flight-phase</property>
@@ -134,6 +138,7 @@
                 <value>TAXI-IN</value>
                 <value>SHUTDOWN</value>
             </binding>
+            -->
         </button>
     </group>
 </PropertyList>
