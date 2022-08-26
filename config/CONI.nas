@@ -359,7 +359,7 @@ var manageFuel = func (worker, mode='CRUISE') {
             worker.addJob(PropertySetJob.new(
                 controlProps.flightEngineer.fuel.getChild('input'),
                 '/controls/fuel/tankvalve[' ~ e ~ ']',
-                (e == 0 or e == 3) ? 2 : 1));
+                (e == 1 or e == 2) ? 2 : 1));
             worker.addJob(PropertySetJob.new(
                 controlProps.flightEngineer.fuel.getChild('input'),
                 '/controls/fuel/crossfeedvalve[' ~ e ~ ']',
@@ -546,7 +546,8 @@ var AutoFlightPhaseJob = {
             var allEnginesTOGA = 1;
             for (var e = 0; e < 4; e += 1) {
                 if (me.props.throttle[e].getValue() < 0.9 or
-                    me.props.reverser[e].getBoolValue()) {
+                    me.props.reverser[e].getBoolValue() or
+                    !me.props.engineRunning[e].getBoolValue()) {
                     allEnginesTOGA = 0;
                     break;
                 }
