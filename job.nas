@@ -25,7 +25,7 @@ var BaseJob = {
         }
         else {
             if (me.reportOutputProp != nil) {
-                me.reportOutputProp.setValue('OFF');
+                me.reportOutputProp.setValue('---');
             }
         }
     },
@@ -180,8 +180,11 @@ var MasterJob = {
         me.listener = setlistener(rcprops.flightPhase, func (node) {
             var phase = node.getValue();
             me.removeAllJobs();
-            foreach (var k; keys(controlProps.flightEngineer)) {
-                controlProps.flightEngineer[k].setValue('status', 'OFF');
+            var crewMembers = props.globals.getNode('robocrew/crew').getChildren();
+            foreach (var role; crewMembers) {
+                foreach (var control; role.getChildren('control')) {
+                    control.setValue('status', '---');
+                }
             }
             me.loadJobs(phase);
         }, 1, 0);

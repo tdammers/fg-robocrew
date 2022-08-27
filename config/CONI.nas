@@ -38,10 +38,17 @@ controlProps.flightEngineer.fuel.setValue('type', 'checkbox');
 controlProps.flightEngineer.fuel.setValue('input', 1);
 controlProps.flightEngineer.fuel.setValue('status', 'OK');
 
+controlProps.flightEngineer.electrical = crewProps.flightEngineer.getNode('control[5]', 1);
+controlProps.flightEngineer.electrical.setValue('name', 'Electrical Systems');
+controlProps.flightEngineer.electrical.setValue('type', 'checkbox');
+controlProps.flightEngineer.electrical.setValue('input', 1);
+controlProps.flightEngineer.electrical.setValue('status', 'OK');
+
 var FuelManagementJob = {
-    new: func (commandProp) {
+    new: func (commandProp, mode) {
         var m = BaseJob.new(commandProp.getChild('input'), commandProp.getChild('status'));
         m.parents = [FuelManagementJob] ~ m.parents;
+        m.mode = mode;
         m.tankProps = {
             tank1: props.globals.getNode('consumables/fuel/tank[4]/level-lbs'),
             tank2: props.globals.getNode('consumables/fuel/tank[5]/level-lbs'),
@@ -118,7 +125,7 @@ var FuelManagementJob = {
         #         me.valveProps.tank[i].getValue(),
         #         me.valveProps.cross[i].getValue() ? 'X' : ' ');
 
-        # First check if we have fuel imbalance.
+        # Check if we have fuel imbalance.
         var balanced = 1;
         for (i = 0; i < 4; i += 1) {
             if (totals[i] > median + limit or totals[i] < median - limit) {
@@ -126,7 +133,16 @@ var FuelManagementJob = {
                 break;
             }
         }
-        if (balanced) {
+
+        if (me.mode == 'TAKEOFF') {
+            me.scenario = 'TAKEOFF';
+            me.valveProps.tank[4].setValue(0);
+            for (i = 0; i < 4; i += 1) {
+                me.valveProps.tank[i].setValue(onValues[i]);
+                me.valveProps.cross[i].setValue(0);
+            }
+        }
+        elsif (balanced) {
             if (me.tankProps.tankCenter.getValue() >= limit) {
                 me.scenario = 'FUEL IN CTR';
                 me.valveProps.tank[4].setValue(1);
@@ -147,7 +163,7 @@ var FuelManagementJob = {
             }
         }
         else {
-            me.scenario = 'FUEL IMBALANCE';
+            me.scenario = 'CROSSFEEDING';
             for (i = 0; i < 4; i += 1) {
                 if (totals[i] > median + limit) {
                     # Too much fuel in this tank: enable xfeed
@@ -363,49 +379,37 @@ var leanToPeak = func (worker) { return manageMixture(worker, 1); };
 var enrichToPeak = func (worker) { return manageMixture(worker, 0); };
 
 var manageFuel = func (worker, mode='CRUISE') {
-    if (mode == 'TAKEOFF') {
-        foreach (var e; [0,1,2,3]) {
-            worker.addJob(PropertySetJob.new(
-                controlProps.flightEngineer.fuel.getChild('input'),
-                '/controls/fuel/tankvalve[' ~ e ~ ']',
-                1));
-            worker.addJob(PropertySetJob.new(
-                controlProps.flightEngineer.fuel.getChild('input'),
-                '/controls/fuel/crossfeedvalve[' ~ e ~ ']',
-                0));
-        }
-        worker.addJob(PropertySetJob.new(
-            controlProps.flightEngineer.fuel.getChild('input'),
-            '/controls/fuel/tankvalve[4]',
-            0));
-        worker.addJob(ReportingJob.new(
-            controlProps.flightEngineer.fuel,
-            func { return 'TAKEOFF'; }));
-    }
-    elsif (mode == 'LANDING') {
-        foreach (var e; [0,1,2,3]) {
-            worker.addJob(PropertySetJob.new(
-                controlProps.flightEngineer.fuel.getChild('input'),
-                '/controls/fuel/tankvalve[' ~ e ~ ']',
-                (e == 1 or e == 2) ? 2 : 1));
-            worker.addJob(PropertySetJob.new(
-                controlProps.flightEngineer.fuel.getChild('input'),
-                '/controls/fuel/crossfeedvalve[' ~ e ~ ']',
-                0));
-        }
-        worker.addJob(PropertySetJob.new(
-            controlProps.flightEngineer.fuel.getChild('input'),
-            '/controls/fuel/tankvalve[4]',
-            0));
-        worker.addJob(ReportingJob.new(
-            controlProps.flightEngineer.fuel,
-            func { return 'APPR/LAND'; }));
-    }
-    else {
-        worker.addJob(FuelManagementJob.new(controlProps.flightEngineer.fuel));
-    }
+    worker.addJob(FuelManagementJob.new(controlProps.flightEngineer.fuel, mode));
 };
 
+setupElectrical = func (worker) {
+    for (var e = 0; e < 4; e += 1) {
+        worker.addJob(
+            PropertySetJob.new(
+                controlProps.flightEngineer.electrical.getNode('input'),
+                'controls/switches/generator[' ~ e ~ ']',
+                1));
+        worker.addJob(
+            PropertySetJob.new(
+                controlProps.flightEngineer.electrical.getNode('input'),
+                'controls/engines/engine[' ~ e ~ ']/magnetos',
+                3));
+    }
+    worker.addJob(
+        PropertySetJob.new(
+            controlProps.flightEngineer.electrical.getNode('input'),
+            'controls/switches/battery-ship',
+            1));
+    worker.addJob(
+        PropertySetJob.new(
+            controlProps.flightEngineer.electrical.getNode('input'),
+            'controls/switches/gen-apu',
+            1));
+    worker.addJob(
+        ReportingJob.new(
+            controlProps.flightEngineer.electrical,
+            func { return 'OK'; }));
+};
 
 var FlightEngineerMasterJob = {
     new: func (worker) {
@@ -421,6 +425,7 @@ var FlightEngineerMasterJob = {
             maintainMP(me, nil);
             manageFuel(me, 'TAKEOFF');
             setRPM(me, 'FULL FWD', -1.0);
+            setupElectrical(me);
         }
         elsif (phase == 'TAKEOFF') {
             cowlFlapsFullOpen(me);
