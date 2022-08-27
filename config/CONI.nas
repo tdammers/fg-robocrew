@@ -54,115 +54,143 @@ var FuelManagementJob = {
             tank4A: props.globals.getNode('consumables/fuel/tank[12]/level-lbs'),
         };
         m.valveProps = {
-            cross1: props.globals.getNode('controls/fuel/crossfeedvalve[0]'),
-            cross2: props.globals.getNode('controls/fuel/crossfeedvalve[1]'),
-            cross3: props.globals.getNode('controls/fuel/crossfeedvalve[2]'),
-            cross4: props.globals.getNode('controls/fuel/crossfeedvalve[3]'),
-            tank1: props.globals.getNode('controls/fuel/tankvalve[0]'),
-            tank2: props.globals.getNode('controls/fuel/tankvalve[1]'),
-            tank3: props.globals.getNode('controls/fuel/tankvalve[2]'),
-            tank4: props.globals.getNode('controls/fuel/tankvalve[3]'),
-            tankCenter: props.globals.getNode('controls/fuel/tankvalve[4]'),
+            cross: [
+                props.globals.getNode('controls/fuel/crossfeedvalve[0]'),
+                props.globals.getNode('controls/fuel/crossfeedvalve[1]'),
+                props.globals.getNode('controls/fuel/crossfeedvalve[2]'),
+                props.globals.getNode('controls/fuel/crossfeedvalve[3]'),
+            ],
+            tank: [
+                props.globals.getNode('controls/fuel/tankvalve[0]'),
+                props.globals.getNode('controls/fuel/tankvalve[1]'),
+                props.globals.getNode('controls/fuel/tankvalve[2]'),
+                props.globals.getNode('controls/fuel/tankvalve[3]'),
+                props.globals.getNode('controls/fuel/tankvalve[4]'),
+            ],
         };
-        m.crossfeeding = '';
-        m.usingCenter = 0;
+        m.scenario = 'DISENGAGED';
         return m;
     },
 
     update: func (dt) {
-        var eng1total = me.tankProps.tank1.getValue() + me.tankProps.tank1A.getValue();
-        var eng2total = me.tankProps.tank2.getValue() + me.tankProps.tank2A.getValue();
-        var eng3total = me.tankProps.tank3.getValue() + me.tankProps.tank3A.getValue();
-        var eng4total = me.tankProps.tank4.getValue() + me.tankProps.tank4A.getValue();
-        var diff12 = eng1total - eng2total;
-        var diff43 = eng4total - eng3total;
-        var centerLevel = me.tankProps.tankCenter.getValue();
+        var i = 0;
+        var limit = 50;
 
-        me.usingCenter = 0;
-        me.crossfeeding = '';
+        var totals = [
+            me.tankProps.tank1.getValue() + me.tankProps.tank1A.getValue(),
+            me.tankProps.tank2.getValue() + me.tankProps.tank2A.getValue(),
+            me.tankProps.tank3.getValue() + me.tankProps.tank3A.getValue(),
+            me.tankProps.tank4.getValue() + me.tankProps.tank4A.getValue(),
+            me.tankProps.tankCenter.getValue()
+        ];
 
-        if (centerLevel > 200) {
-            # Allow feeding from center tank
-            me.valveProps.tankCenter.setValue(1);
-            me.usingCenter = 1;
+        var onValues = [ 1, 1, 1, 1 ];
+        var low2 = (me.tankProps.tank2.getValue() < limit);
+        var low3 = (me.tankProps.tank3.getValue() < limit);
 
-            # If tank 1 has substantially more fuel than tanks 2, set engine 1
-            # to feed from tank 1, and engine 2 from center
-            if (diff12 > 100) {
-                me.valveProps.tank1.setValue(1);
-                me.valveProps.cross1.setValue(0);
-                me.valveProps.cross2.setValue(1);
-                me.valveProps.tank2.setValue(0);
-                me.crossfeeding ~= '2';
-            }
-            else {
-                # Feed both 1 and 2 from center
-                me.valveProps.cross1.setValue(1);
-                me.valveProps.cross2.setValue(1);
-                me.valveProps.tank1.setValue(0);
-                me.valveProps.tank2.setValue(0);
-                me.crossfeeding ~= '12';
-            }
-
-            # If tank 4 has substantially more fuel than tanks 3, set engine 4
-            # to feed from tank 4, and engine 3 from center
-            if (diff43 > 100) {
-                me.valveProps.tank4.setValue(1);
-                me.valveProps.cross4.setValue(0);
-                me.valveProps.cross3.setValue(1);
-                me.valveProps.tank3.setValue(0);
-                me.crossfeeding ~= '4';
-            }
-            else {
-                # Feed both 4 and 3 from center
-                me.valveProps.cross4.setValue(1);
-                me.valveProps.cross3.setValue(1);
-                me.valveProps.tank4.setValue(0);
-                me.valveProps.tank3.setValue(0);
-                me.crossfeeding ~= '34';
-            }
+        if (low2 or low3) {
+            onValues[1] = low2 ? 2 : 1;
+            onValues[2] = low3 ? 2 : 1;
         }
-        elsif (centerLevel > 10) {
-            # Some fuel left in center, but just to be safe, feed engines from
-            # wing tanks, too
-            me.valveProps.tankCenter.setValue(1);
-            me.valveProps.tank1.setValue(1);
-            me.valveProps.tank2.setValue(1);
-            me.valveProps.tank4.setValue(1);
-            me.valveProps.tank3.setValue(1);
-            me.valveProps.cross1.setValue(1);
-            me.valveProps.cross2.setValue(1);
-            me.valveProps.cross4.setValue(1);
-            me.valveProps.cross3.setValue(1);
-            me.usingCenter = 1;
-            me.crossfeeding = 'ALL';
+        elsif (me.tankProps.tank2A.getValue() < me.tankProps.tank3A.getValue() - limit) {
+            # Imbalance: 2A much lower than 3A
+            onValues[1] = 1;
+            onValues[2] = 2;
+        }
+        elsif (me.tankProps.tank3A.getValue() < me.tankProps.tank2A.getValue() - limit) {
+            # Imbalance: 3A much lower than 2A
+            onValues[1] = 2;
+            onValues[2] = 1;
         }
         else {
-            # Center tank is empty
-            me.valveProps.tankCenter.setValue(0);
-            me.valveProps.tank1.setValue(1);
-            if (me.tankProps.tank2.getValue() > 5)
-                me.valveProps.tank2.setValue(1);
-            else
-                me.valveProps.tank2.setValue(2);
-            me.valveProps.tank4.setValue(1);
-            if (me.tankProps.tank3.getValue() > 5)
-                me.valveProps.tank3.setValue(1);
-            else
-                me.valveProps.tank3.setValue(3);
-            me.valveProps.cross1.setValue(0);
-            me.valveProps.cross2.setValue(0);
-            me.valveProps.cross4.setValue(0);
-            me.valveProps.cross3.setValue(0);
-            me.crossfeeding = 'OFF';
+            onValues[1] = 1;
+            onValues[2] = 1;
+        }
+
+        var allLevels = sort(totals, func (a, b) { return b - a; });
+        var median = (allLevels[1] + allLevels[2]) * 0.5;
+        # printf("med: %1.0f", median);
+        # for (i = 0; i < 4; i += 1)
+        #     printf("%i: %1.0f (%+6.1f) %i %s",
+        #         i + 1,
+        #         totals[i],
+        #         totals[i] - median,
+        #         me.valveProps.tank[i].getValue(),
+        #         me.valveProps.cross[i].getValue() ? 'X' : ' ');
+
+        # First check if we have fuel imbalance.
+        var balanced = 1;
+        for (i = 0; i < 4; i += 1) {
+            if (totals[i] > median + limit or totals[i] < median - limit) {
+                balanced = 0;
+                break;
+            }
+        }
+        if (balanced) {
+            if (me.tankProps.tankCenter.getValue() >= limit) {
+                me.scenario = 'FUEL IN CTR';
+                me.valveProps.tank[4].setValue(1);
+                for (i = 0; i < 4; i += 1) {
+                    me.valveProps.tank[i].setValue(0);
+                    me.valveProps.cross[i].setValue(0);
+                }
+            }
+            else {
+                me.scenario = 'BALANCED';
+                for (i = 0; i < 4; i += 1) {
+                    me.valveProps.tank[i].setValue(onValues[i]);
+                }
+                for (i = 0; i < 4; i += 1) {
+                    me.valveProps.cross[i].setValue(0);
+                }
+                me.valveProps.tank[4].setValue(0);
+            }
+        }
+        else {
+            me.scenario = 'FUEL IMBALANCE';
+            for (i = 0; i < 4; i += 1) {
+                if (totals[i] > median + limit) {
+                    # Too much fuel in this tank: enable xfeed
+                    me.valveProps.tank[i].setValue(onValues[i]);
+                    me.valveProps.cross[i].setValue(1);
+                }
+            }
+            for (i = 0; i < 4; i += 1) {
+                if (totals[i] <= median + limit and totals[i] > median - limit) {
+                    # Correct amount of fuel, feed only local engine
+                    me.valveProps.tank[i].setValue(onValues[i]);
+                    me.valveProps.cross[i].setValue(0);
+                }
+            }
+            for (i = 0; i < 4; i += 1) {
+                if (totals[i] <= median - limit) {
+                    # Fuel low, turn this tank off
+                    me.valveProps.tank[i].setValue(0);
+                    me.valveProps.cross[i].setValue(1);
+                }
+            }
+            # Turn off center tank
+            me.valveProps.tank[4].setValue(0);
         }
     },
 
     report: func {
-        var status = 'XFEED ' ~ me.crossfeeding;
-        if (me.usingCenter)
-            status ~= ', CTR';
-        return status;
+        var result = me.scenario;
+        for (i = 0; i < 4; i += 1) {
+            result ~= ' ';
+            if (me.valveProps.tank[i].getValue() == 0)
+                result ~= '-';
+            elsif (me.valveProps.tank[i].getValue() == 1)
+                result ~= sprintf('%i', i + 1);
+            elsif (me.valveProps.tank[i].getValue() == 2)
+                result ~= sprintf('%iA', i + 1);
+            if (me.valveProps.cross[i].getValue())
+                result ~= 'X';
+        }
+        if (me.valveProps.tank[4].getValue()) {
+            result ~= ' 5';
+        }
+        return result;
     },
 };
 
