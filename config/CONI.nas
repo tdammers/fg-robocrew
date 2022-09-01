@@ -81,7 +81,7 @@ var FuelManagementJob = {
 
     update: func (dt) {
         var i = 0;
-        var limit = 50;
+        var limit = 10;
 
         var totals = [
             me.tankProps.tank1.getValue() + me.tankProps.tank1A.getValue(),
@@ -89,6 +89,11 @@ var FuelManagementJob = {
             me.tankProps.tank3.getValue() + me.tankProps.tank3A.getValue(),
             me.tankProps.tank4.getValue() + me.tankProps.tank4A.getValue(),
             me.tankProps.tankCenter.getValue()
+        ];
+
+        var totalsPerSide = [
+            totals[0] + totals[1],
+            totals[2] + totals[3],
         ];
 
         var onValues = [ 1, 1, 1, 1 ];
@@ -116,23 +121,6 @@ var FuelManagementJob = {
 
         var allLevels = sort(totals, func (a, b) { return b - a; });
         var median = (allLevels[1] + allLevels[2]) * 0.5;
-        # printf("med: %1.0f", median);
-        # for (i = 0; i < 4; i += 1)
-        #     printf("%i: %1.0f (%+6.1f) %i %s",
-        #         i + 1,
-        #         totals[i],
-        #         totals[i] - median,
-        #         me.valveProps.tank[i].getValue(),
-        #         me.valveProps.cross[i].getValue() ? 'X' : ' ');
-
-        # Check if we have fuel imbalance.
-        var balanced = 1;
-        for (i = 0; i < 4; i += 1) {
-            if (totals[i] > median + limit or totals[i] < median - limit) {
-                balanced = 0;
-                break;
-            }
-        }
 
         if (me.mode == 'TAKEOFF') {
             me.scenario = 'TAKEOFF';
@@ -142,50 +130,100 @@ var FuelManagementJob = {
                 me.valveProps.cross[i].setValue(0);
             }
         }
-        elsif (balanced) {
-            if (me.tankProps.tankCenter.getValue() >= limit) {
-                me.scenario = 'FUEL IN CTR';
-                me.valveProps.tank[4].setValue(1);
-                for (i = 0; i < 4; i += 1) {
-                    me.valveProps.tank[i].setValue(0);
-                    me.valveProps.cross[i].setValue(0);
-                }
-            }
-            else {
-                me.scenario = 'BALANCED';
-                for (i = 0; i < 4; i += 1) {
-                    me.valveProps.tank[i].setValue(onValues[i]);
-                }
-                for (i = 0; i < 4; i += 1) {
-                    me.valveProps.cross[i].setValue(0);
-                }
-                me.valveProps.tank[4].setValue(0);
-            }
+        elsif (totals[4] >= limit) {
+            # 5 2 3 5
+            me.scenario = 'EMPTY CTR';
+
+            me.valveProps.tank[4].setValue(1);
+
+            me.valveProps.cross[0].setValue(1);
+            me.valveProps.tank[1].setValue(onValues[1]);
+            me.valveProps.tank[2].setValue(onValues[2]);
+            me.valveProps.cross[3].setValue(1);
+
+            me.valveProps.tank[0].setValue(0);
+            me.valveProps.cross[1].setValue(0);
+            me.valveProps.cross[2].setValue(0);
+            me.valveProps.tank[3].setValue(0);
+
+        }
+        elsif (totals[0] < totals[1] - limit) {
+            # 2 2 3 4
+            me.scenario = 'XFEED LEFT';
+
+            me.valveProps.cross[0].setValue(1);
+            me.valveProps.tank[1].setValue(onValues[1]);
+            me.valveProps.cross[1].setValue(1);
+            me.valveProps.tank[2].setValue(onValues[2]);
+            me.valveProps.tank[3].setValue(onValues[3]);
+
+            me.valveProps.tank[0].setValue(0);
+            me.valveProps.cross[2].setValue(0);
+            me.valveProps.cross[3].setValue(0);
+
+            me.valveProps.tank[4].setValue(0);
+        }
+        elsif (totals[1] < totals[0] - limit) {
+            # 1 1 3 4
+            me.scenario = 'XFEED LEFT';
+
+            me.valveProps.cross[1].setValue(1);
+            me.valveProps.tank[0].setValue(onValues[0]);
+            me.valveProps.cross[0].setValue(1);
+            me.valveProps.tank[2].setValue(onValues[2]);
+            me.valveProps.tank[3].setValue(onValues[3]);
+
+            me.valveProps.tank[1].setValue(0);
+            me.valveProps.cross[2].setValue(0);
+            me.valveProps.cross[3].setValue(0);
+
+            me.valveProps.tank[4].setValue(0);
+        }
+        elsif (totals[3] < totals[2] - limit) {
+            # 1 2 3 3
+            me.scenario = 'XFEED RIGHT';
+
+            me.valveProps.tank[0].setValue(onValues[0]);
+            me.valveProps.tank[1].setValue(onValues[1]);
+            me.valveProps.tank[2].setValue(onValues[2]);
+            me.valveProps.cross[2].setValue(1);
+            me.valveProps.cross[3].setValue(1);
+
+            me.valveProps.cross[0].setValue(0);
+            me.valveProps.cross[1].setValue(0);
+            me.valveProps.tank[3].setValue(0);
+
+            me.valveProps.tank[4].setValue(0);
+        }
+        elsif (totals[2] < totals[3] - limit) {
+            # 1 2 4 4
+            me.scenario = 'XFEED RIGHT';
+
+            me.valveProps.tank[0].setValue(onValues[0]);
+            me.valveProps.tank[1].setValue(onValues[1]);
+            me.valveProps.cross[2].setValue(1);
+            me.valveProps.tank[3].setValue(onValues[3]);
+            me.valveProps.cross[3].setValue(1);
+
+            me.valveProps.cross[0].setValue(0);
+            me.valveProps.cross[1].setValue(0);
+            me.valveProps.tank[2].setValue(0);
+
+            me.valveProps.tank[4].setValue(0);
         }
         else {
-            me.scenario = 'CROSSFEEDING';
-            for (i = 0; i < 4; i += 1) {
-                if (totals[i] > median + limit) {
-                    # Too much fuel in this tank: enable xfeed
-                    me.valveProps.tank[i].setValue(onValues[i]);
-                    me.valveProps.cross[i].setValue(1);
-                }
-            }
-            for (i = 0; i < 4; i += 1) {
-                if (totals[i] <= median + limit and totals[i] > median - limit) {
-                    # Correct amount of fuel, feed only local engine
-                    me.valveProps.tank[i].setValue(onValues[i]);
-                    me.valveProps.cross[i].setValue(0);
-                }
-            }
-            for (i = 0; i < 4; i += 1) {
-                if (totals[i] <= median - limit) {
-                    # Fuel low, turn this tank off
-                    me.valveProps.tank[i].setValue(0);
-                    me.valveProps.cross[i].setValue(1);
-                }
-            }
-            # Turn off center tank
+            # 1 2 3 4
+            me.scenario = 'CRUISE/LAND';
+            me.valveProps.tank[0].setValue(onValues[0]);
+            me.valveProps.tank[1].setValue(onValues[1]);
+            me.valveProps.tank[2].setValue(onValues[2]);
+            me.valveProps.tank[3].setValue(onValues[3]);
+
+            me.valveProps.cross[0].setValue(0);
+            me.valveProps.cross[1].setValue(0);
+            me.valveProps.cross[2].setValue(0);
+            me.valveProps.cross[3].setValue(0);
+
             me.valveProps.tank[4].setValue(0);
         }
     },
