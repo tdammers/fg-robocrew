@@ -45,31 +45,43 @@ var ReportingJob = {
 };
 
 var PropertySetJob = {
-    new: func (masterSwitchProp, targetProp, targetValue) {
+    new: func (masterSwitchProp, targetProp, targetValue, easeRate=nil) {
         var m = BaseJob.new(masterSwitchProp);
         m.parents = [PropertySetJob] ~ m.parents;
         m.targetProp = propify(targetProp);
         m.targetValue = targetValue;
+        m.easeRate = easeRate;
         return m;
     },
 
     update: func (dt) {
-        me.targetProp.setValue(me.targetValue);
+        if (me.easeRate == nil)
+            me.targetProp.setValue(me.targetValue);
+        else {
+            var current = me.targetProp.getValue() or 0;
+            if (current > me.targetValue)
+                current = math.max(me.targetValue, current - me.easeRate * dt);
+            elsif (current < me.targetValue)
+                current = math.min(me.targetValue, current + me.easeRate * dt);
+            me.targetProp.setValue(current);
+        }
     },
 };
 
 var PropertyTargetJob = {
-    new: func (masterSwitchProp, targetProp, targetValue, outputProp, p, i=0, d=0, stepSize=nil) {
+    new: func (masterSwitchProp, targetProp, targetValue, outputProp, p, i=0, d=0, stepSize=nil, easeRate=1) {
         var m = BaseJob.new(masterSwitchProp);
         m.parents = [PropertyTargetJob] ~ m.parents;
         m.targetProp = propify(targetProp);
         m.targetValue = targetValue;
+        m.currentTargetValue = m.targetProp.getValue();
         m.outputProp = propify(outputProp);
         m.stepSize = stepSize;
         m.p = p;
         m.i = i;
         m.d = d;
         m.lastError = 0;
+        m.easeRate = easeRate;
         m.engaged = 0;
         return m;
     },
@@ -82,7 +94,13 @@ var PropertyTargetJob = {
         }
         else {
             me.engaged = 1;
-            var error = value - targetValue;
+            if (me.currentTargetValue > targetValue) {
+                me.currentTargetValue = math.max(targetValue, me.currentTargetValue - me.easeRate * dt);
+            }
+            elsif (me.currentTargetValue < targetValue) {
+                me.currentTargetValue = math.min(targetValue, me.currentTargetValue + me.easeRate * dt);
+            }
+            var error = value - me.currentTargetValue;
             var errorIntegral = (me.lastError + error) * 0.5 / dt;
             var errorDerivative = (error - me.lastError) / dt;
             var correction = (error * me.p + errorIntegral * me.i + errorDerivative * me.d) * dt;

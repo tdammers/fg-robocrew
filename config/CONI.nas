@@ -248,7 +248,6 @@ var FuelManagementJob = {
     },
 };
 
-# targetMP: nil = disengage
 var maintainMP = func (worker, targetMP) {
     if (targetMP != nil) {
         foreach (var e; [0,1,2,3]) {
@@ -258,7 +257,8 @@ var maintainMP = func (worker, targetMP) {
                     '/engines/engine[' ~ e ~ ']/mp-inhg',
                     targetMP,
                     '/controls/engines/engine[' ~ e ~ ']/throttle',
-                    -0.01, -0.0002, -0.01));
+                    -0.01, -0.0002, -0.01, nil,
+                    20));
         }
     }
     worker.addJob(
@@ -326,7 +326,7 @@ var setRPM = func (worker, targetRPM, pitchSetting) {
         worker.addJob(PropertySetJob.new(
             controlProps.flightEngineer.rpm.getChild('input'),
             '/controls/engines/propeller-pitch-all',
-            pitchSetting));
+            pitchSetting, 0.5));
     }
     worker.addJob(
         ReportingJob.new(
