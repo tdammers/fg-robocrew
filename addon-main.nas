@@ -38,6 +38,7 @@ var load_module = func (module) {
 
 load_module('worker.nas');
 load_module('crew.nas');
+load_module('actions.nas');
 load_module('job.nas');
 
 if (!rcprops.flightPhase.getValue()) {

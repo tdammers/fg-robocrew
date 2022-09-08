@@ -44,6 +44,35 @@ var ReportingJob = {
     },
 };
 
+var TriggerJob = {
+    new: func (controlProp, action, setCondition = nil, resetCondition = nil, isSet = 0) {
+        var m = BaseJob.new(controlProp.getChild('input'), controlProp.getChild('status'));
+        m.parents = [TriggerJob] ~ m.parents;
+        m.setCondition = setCondition;
+        m.resetCondition = resetCondition;
+        m.isSet = isSet;
+        m.action = action;
+        return m;
+    },
+
+    report: func () {
+        return 'OK';
+    },
+
+    update: func (dt) {
+        if (me.isSet and typeof(me.resetCondition) == 'func' and me.resetCondition()) {
+            printf("turn off");
+            me.action(0);
+            me.isSet = 0;
+        }
+        elsif (!me.isSet and typeof(me.setCondition) == 'func' and me.setCondition()) {
+            printf("turn on");
+            me.action(1);
+            me.isSet = 1;
+        }
+    },
+};
+
 var PropertySetJob = {
     new: func (masterSwitchProp, targetProp, targetValue, easeRate=nil) {
         var m = BaseJob.new(masterSwitchProp);

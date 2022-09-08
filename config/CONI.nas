@@ -1,12 +1,22 @@
 var crewProps = {
+    'firstOfficer': globals.robocrew.rcprops.crew.getNode('first-officer[0]', 1),
     'flightEngineer': globals.robocrew.rcprops.crew.getNode('flight-engineer[0]', 1),
 };
 
+crewProps.firstOfficer.setValue('name', 'First Officer');
 crewProps.flightEngineer.setValue('name', 'Flight Engineer');
 
 var controlProps = {
+    firstOfficer: {},
     flightEngineer: {},
 };
+
+controlProps.firstOfficer.callouts = crewProps.firstOfficer.getNode('control[0]', 1);
+controlProps.firstOfficer.callouts.setValue('name', 'Takeoff & Landing Callouts');
+controlProps.firstOfficer.callouts.setValue('type', 'checkbox');
+controlProps.firstOfficer.callouts.setValue('input', 1);
+controlProps.firstOfficer.callouts.setValue('status', 'OK');
+
 
 controlProps.flightEngineer.throttle = crewProps.flightEngineer.getNode('control[0]', 1);
 controlProps.flightEngineer.throttle.setValue('name', 'Throttle & Boost');
@@ -412,9 +422,19 @@ var manageMixture = func (worker, mode) {
     }
 };
 
-
-var leanToPeak = func (worker) { return manageMixture(worker, 1); };
-var enrichToPeak = func (worker) { return manageMixture(worker, 0); };
+takeoffCallouts = func (worker) {
+    worker.addJob(
+        TriggerJob.new(
+            controlProps.firstOfficer.callouts,
+            func (on) { if (on) setprop('/sim/messages/copilot', '80 knots'); },
+            func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') > 80; },
+            func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') < 40; }));
+    worker.addJob(
+        TriggerJob.new(
+            controlProps.firstOfficer.callouts,
+            func (on) { if (on) setprop('/sim/messages/copilot', 'Positive climb'); },
+            func { return getprop('/instrumentation/vertical-speed-indicator/indicated-speed-fpm') > 500; }));
+};
 
 var manageFuel = func (worker, mode='CRUISE') {
     worker.addJob(FuelManagementJob.new(controlProps.flightEngineer.fuel, mode));
@@ -447,6 +467,34 @@ setupElectrical = func (worker) {
         ReportingJob.new(
             controlProps.flightEngineer.electrical,
             func { return 'OK'; }));
+};
+
+var FirstOfficerMasterJob = {
+    new: func (worker) {
+        var m = MasterJob.new(worker);
+        m.parents = [FirstOfficerMasterJob] ~ m.parents;
+        return m;
+    },
+
+    loadJobs: func (phase) {
+        if (phase == 'PREFLIGHT' or phase == 'TAXI-OUT') {
+        }
+        elsif (phase == 'TAKEOFF') {
+            takeoffCallouts(me);
+        }
+        elsif (phase == 'CLIMB') {
+        }
+        elsif (phase == 'CRUISE') {
+        }
+        elsif (phase == 'DESCENT') {
+        }
+        elsif (phase == 'APPROACH') {
+        }
+        elsif (phase == 'LANDING') {
+        }
+        elsif (phase == 'TAXI-IN') {
+        }
+    },
 };
 
 var FlightEngineerMasterJob = {
@@ -641,6 +689,12 @@ var makeFlightEngineer = func {
     return worker;
 };
 
+var makeFirstOfficer = func {
+    var worker = Worker.new();
+    worker.addJob(FirstOfficerMasterJob.new(worker));
+    return worker;
+};
+
 var makeAutoFlightPhaseWorker = func {
     var worker = Worker.new();
     worker.addJob(AutoFlightPhaseJob.new(worker));
@@ -649,4 +703,5 @@ var makeAutoFlightPhaseWorker = func {
 
 var crew = Crew.new();
 crew.addWorker(makeFlightEngineer());
+crew.addWorker(makeFirstOfficer());
 crew.addWorker(makeAutoFlightPhaseWorker());
