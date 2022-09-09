@@ -18,7 +18,7 @@ var rcprops = {
     flightPhases: props.globals.getNode('/robocrew/common/flight-phases', 1),
     autoFlightPhase: props.globals.getNode('/robocrew/common/auto-flight-phase', 1),
     crew: props.globals.getNode('/robocrew/crew', 1),
-    soundQueue: props.globals.getNode('/sim/sound/robocrew'),
+    soundQueue: props.globals.getNode('/sim/sound/robocrew', 1),
 };
 
 rcprops.soundQueue.setBoolValue('enabled', 1);

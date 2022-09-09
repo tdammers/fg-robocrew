@@ -505,7 +505,7 @@ landingCallouts = func (worker) {
                 TriggerJob.new(
                     controlProps.firstOfficer.callouts,
                     func (on) { if (on) callout(printf("1.0f", alt), alt ~ '.wav'); },
-                    func { getprop('/position/altitude-agl-ft') <= alt; }));
+                    func { getprop('/position/altitude-agl-ft') - 8.25 <= alt; }));
         })(alt);
 };
 
