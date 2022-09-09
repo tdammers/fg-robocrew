@@ -12,10 +12,28 @@ var controlProps = {
 };
 
 controlProps.firstOfficer.callouts = crewProps.firstOfficer.getNode('control[0]', 1);
-controlProps.firstOfficer.callouts.setValue('name', 'Takeoff & Landing Callouts');
+controlProps.firstOfficer.callouts.setValue('name', 'Callouts');
 controlProps.firstOfficer.callouts.setValue('type', 'checkbox');
 controlProps.firstOfficer.callouts.setValue('input', 1);
 controlProps.firstOfficer.callouts.setValue('status', 'OK');
+
+controlProps.firstOfficer.v1 = crewProps.firstOfficer.getNode('control[1]', 1);
+controlProps.firstOfficer.v1.setValue('name', 'V1');
+controlProps.firstOfficer.v1.setValue('type', 'text');
+controlProps.firstOfficer.v1.setValue('input', '100');
+controlProps.firstOfficer.v1.setValue('status', 'OK');
+
+controlProps.firstOfficer.vr = crewProps.firstOfficer.getNode('control[2]', 1);
+controlProps.firstOfficer.vr.setValue('name', 'Vr');
+controlProps.firstOfficer.vr.setValue('type', 'text');
+controlProps.firstOfficer.vr.setValue('input', '110');
+controlProps.firstOfficer.vr.setValue('status', 'OK');
+
+controlProps.firstOfficer.v2 = crewProps.firstOfficer.getNode('control[3]', 1);
+controlProps.firstOfficer.v2.setValue('name', 'V2');
+controlProps.firstOfficer.v2.setValue('type', 'text');
+controlProps.firstOfficer.v2.setValue('input', '115');
+controlProps.firstOfficer.v2.setValue('status', 'OK');
 
 
 controlProps.flightEngineer.throttle = crewProps.flightEngineer.getNode('control[0]', 1);
@@ -432,8 +450,58 @@ takeoffCallouts = func (worker) {
     worker.addJob(
         TriggerJob.new(
             controlProps.firstOfficer.callouts,
+            func (on) { if (on) setprop('/sim/messages/copilot', 'V1'); },
+            func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') > controlProps.firstOfficer.v1.getValue('input'); },
+            func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') < 40; }));
+    worker.addJob(
+        TriggerJob.new(
+            controlProps.firstOfficer.callouts,
+            func (on) { if (on) setprop('/sim/messages/copilot', 'Rotate'); },
+            func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') > controlProps.firstOfficer.vr.getValue('input'); },
+            func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') < 40; }));
+    worker.addJob(
+        TriggerJob.new(
+            controlProps.firstOfficer.callouts,
+            func (on) { if (on) setprop('/sim/messages/copilot', 'V2'); },
+            func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') > controlProps.firstOfficer.v2.getValue('input'); },
+            func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') < 40; }));
+    worker.addJob(
+        TriggerJob.new(
+            controlProps.firstOfficer.callouts,
             func (on) { if (on) setprop('/sim/messages/copilot', 'Positive climb'); },
-            func { return getprop('/instrumentation/vertical-speed-indicator/indicated-speed-fpm') > 500; }));
+            func {
+                return
+                    (getprop('/instrumentation/vertical-speed-indicator/indicated-speed-fpm') > 500) and
+                    (getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') > 120);
+            },
+            func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') < 40; }));
+};
+
+climbCallouts = func (worker) {
+    worker.addJob(
+        TriggerJob.new(
+            controlProps.firstOfficer.callouts,
+            func (on) { if (on) setprop('/sim/messages/copilot', '1000 to go'); },
+            func {
+                var altitude = getprop('/instrumentation/altimeter/indicated-altitude-ft');
+                var cruiseAltitude =
+                        getprop('/autopilot/route-manager/cruise/altitude-ft') or
+                        (getprop('/autopilot/route-manager/cruise/flight-level') or 0) * 100;
+                if (cruiseAltitude) {
+                    return altitude >= cruiseAltitude - 1000;
+                }
+            }));
+};
+
+landingCallouts = func (worker) {
+    foreach (var alt; [1000, 500, 400, 300, 200, 100, 50, 40, 30, 20, 10])
+        (func (alt) {
+            worker.addJob(
+                TriggerJob.new(
+                    controlProps.firstOfficer.callouts,
+                    func (on) { if (on) setprop('/sim/messages/copilot', alt); },
+                    func { getprop('/position/altitude-agl-ft') <= alt; }));
+        })(alt);
 };
 
 var manageFuel = func (worker, mode='CRUISE') {
@@ -483,6 +551,7 @@ var FirstOfficerMasterJob = {
             takeoffCallouts(me);
         }
         elsif (phase == 'CLIMB') {
+            climbCallouts(me);
         }
         elsif (phase == 'CRUISE') {
         }
@@ -491,6 +560,7 @@ var FirstOfficerMasterJob = {
         elsif (phase == 'APPROACH') {
         }
         elsif (phase == 'LANDING') {
+            landingCallouts(me);
         }
         elsif (phase == 'TAXI-IN') {
         }
@@ -611,8 +681,8 @@ var AutoFlightPhaseJob = {
         elsif (phase == 'TAKEOFF') {
             # Transition from TAKEOFF to CLIMB when at safe altitude,
             # sufficient airspeed, and flaps up
-            if (me.props.agl.getValue() > 800
-                and me.props.airspeed.getValue() > 180
+            if (me.props.agl.getValue() > 300
+                and me.props.airspeed.getValue() > 150
                 and me.props.flaps.getValue() < 0.125)
                 return 'CLIMB';
         }

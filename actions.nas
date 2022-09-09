@@ -4,12 +4,13 @@ var dirname = '';
     dirname = io.dirname(caller()[2]);
 })();
 
+# dirname = getprop('/sim/fg-root');
+
 var playSound = func (file, volume=0.75) {
-    print(dirname);
+    printf("%s / %s\n", dirname ~ '/Sounds/', file);
     fgcommand("play-audio-sample", props.Node.new({
-        # path: dirname ~ 'Sounds/',
-        path: getprop('/sim/aircraft-dir') ~ '/Sounds';
-        file: '80kt.wav',
-        volume: 1.0,
+        path: dirname ~ '/Sounds/',
+        file: file,
+        volume: 0.5,
     }));
 };

@@ -26,29 +26,47 @@
             myGroup.addChild('text').setValue('label', crewMember.getValue('name'));
             myGroup.addChild('empty').setValue('stretch', '1');
             var controls = crewMember.getChildren('control');
-            foreach (var control; controls) {
-                var ty = control.getValue('type');
-                var name = control.getValue('name');
-                var input = control.getNode('input');
-                var status = control.getNode('status');
-                var controlGroup = dyngrp.addChild('group');
-                controlGroup.setValue('layout', 'hbox');
-                if (ty == 'checkbox') {
-                    var cb = controlGroup.addChild('checkbox');
-                    cb.setValue('halign', 'left');
-                    cb.setValue('label', name);
-                    cb.setValue('live', 1);
-                    cb.setValue('pref-width', 200);
-                    cb.setValue('property', input.getPath());
-                    cb.addChild('binding').setValue('command', 'dialog-apply');
-                    if (status != nil) {
-                        var statusText = controlGroup.addChild('text');
-                        statusText.setValue('live', 1);
-                        statusText.setValue('pref-width', 500);
-                        statusText.setValue('halign', 'left');
-                        statusText.setValue('property', status.getPath());
+            var controlGroup = dyngrp.addChild('group');
+            controlGroup.setValue('layout', 'table');
+            var y = 0;
+            foreach (var control; controls) { (func (control) {
+                    var ty = control.getValue('type');
+                    var name = control.getValue('name');
+                    var input = control.getNode('input');
+                    var status = control.getNode('status');
+                    if (ty == 'checkbox') {
+                        var cb = controlGroup.addChild('checkbox');
+                        cb.setValue('halign', 'left');
+                        cb.setValue('label', name);
+                        cb.setValue('live', 1);
+                        cb.setValue('row', y);
+                        cb.setValue('col', 0);
+                        cb.setValue('property', input.getPath());
+                        cb.addChild('binding').setValue('command', 'dialog-apply');
+                        if (status != nil) {
+                            var statusText = controlGroup.addChild('text');
+                            statusText.setValue('live', 1);
+                            statusText.setValue('halign', 'left');
+                            statusText.setValue('property', status.getPath());
+                            statusText.setValue('row', y);
+                            statusText.setValue('col', 1);
+                        }
                     }
-                }
+                    elsif (ty == 'text') {
+                        var lbl = controlGroup.addChild('text');
+                        lbl.setValue('halign', 'left');
+                        lbl.setValue('label', name);
+                        lbl.setValue('row', y);
+                        lbl.setValue('col', 0);
+                        var tb = controlGroup.addChild('input');
+                        tb.setValue('halign', 'left');
+                        tb.setValue('property', input.getPath());
+                        tb.setValue('row', y);
+                        tb.setValue('col', 1);
+                        tb.addChild('binding').setValue('command', 'dialog-apply');
+                    }
+                    y += 1;
+                })(control);
             }
           }
         </open>
