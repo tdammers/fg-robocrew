@@ -441,34 +441,48 @@ var manageMixture = func (worker, mode) {
 };
 
 callout = func (msg, sample) {
-    setprop('/sim/messages/copilot', msg);
+    setprop('/sim/messages/copilot', '' ~ msg);
     playSound(sample);
 };
 
+between = func (val, lo, hi) {
+    return val >= lo and val < hi;
+};
+
 takeoffCallouts = func (worker) {
+    var speedProp = props.globals.getNode('/instrumentation/airspeed-indicator/indicated-speed-kt');
     worker.addJob(
         TriggerJob.new(
             controlProps.firstOfficer.callouts,
             func (on) { if (on) callout('80 knots', '80kt.wav'); },
-            func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') > 80; },
+            func { return between(speedProp.getValue(), 80, 90); },
             func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') < 40; }));
     worker.addJob(
         TriggerJob.new(
             controlProps.firstOfficer.callouts,
             func (on) { if (on) callout('V1', 'v1.wav'); },
-            func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') > controlProps.firstOfficer.v1.getValue('input'); },
+            func { return between(speedProp.getValue(),
+                        controlProps.firstOfficer.v1.getValue('input'),
+                        controlProps.firstOfficer.vr.getValue('input'));
+                 },
             func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') < 40; }));
     worker.addJob(
         TriggerJob.new(
             controlProps.firstOfficer.callouts,
             func (on) { if (on) callout('Rotate', 'rotate.wav'); },
-            func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') > controlProps.firstOfficer.vr.getValue('input'); },
+            func { return between(speedProp.getValue(),
+                        controlProps.firstOfficer.vr.getValue('input'),
+                        controlProps.firstOfficer.v2.getValue('input'));
+                 },
             func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') < 40; }));
     worker.addJob(
         TriggerJob.new(
             controlProps.firstOfficer.callouts,
             func (on) { if (on) callout('V2', 'v2.wav'); },
-            func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') > controlProps.firstOfficer.v2.getValue('input'); },
+            func { return between(speedProp.getValue(),
+                        controlProps.firstOfficer.v2.getValue('input'),
+                        controlProps.firstOfficer.v2.getValue('input') + 10);
+                 },
             func { return getprop('/instrumentation/airspeed-indicator/indicated-speed-kt') < 40; }));
     worker.addJob(
         TriggerJob.new(
@@ -504,8 +518,11 @@ landingCallouts = func (worker) {
             worker.addJob(
                 TriggerJob.new(
                     controlProps.firstOfficer.callouts,
-                    func (on) { if (on) callout(printf("1.0f", alt), alt ~ '.wav'); },
-                    func { getprop('/position/altitude-agl-ft') - 8.25 <= alt; }));
+                    func (on) { if (on) callout(alt, alt ~ '.wav'); },
+                    func {
+                        var current_alt = getprop('/position/altitude-agl-ft') - 8.25;
+                        return current_alt < alt + 5 and current_alt > alt - 5;
+                    }));
         })(alt);
 };
 
@@ -749,7 +766,7 @@ var AutoFlightPhaseJob = {
             if (allEnginesTOGA)
                 return 'TAKEOFF';
             if (me.props.groundspeed.getValue() < 40)
-                return 'TAXI-OUT';
+                return 'TAXI-IN';
             return nil;
         }
         else {
