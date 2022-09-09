@@ -18,7 +18,11 @@ var rcprops = {
     flightPhases: props.globals.getNode('/robocrew/common/flight-phases', 1),
     autoFlightPhase: props.globals.getNode('/robocrew/common/auto-flight-phase', 1),
     crew: props.globals.getNode('/robocrew/crew', 1),
+    soundQueue: props.globals.getNode('/sim/sound/robocrew'),
 };
+
+rcprops.soundQueue.setBoolValue('enabled', 1);
+rcprops.soundQueue.setValue('volume', 0.5);
 
 globals.robocrew = {};
 globals.robocrew.rcprops = rcprops;
@@ -35,11 +39,6 @@ var load_module = func (module) {
     var dirname = io.dirname(caller()[2]);
     io.load_nasal(dirname ~ '/' ~ module, 'robocrew');
 };
-
-load_module('worker.nas');
-load_module('crew.nas');
-load_module('actions.nas');
-load_module('job.nas');
 
 if (!rcprops.flightPhase.getValue()) {
     rcprops.flightPhase.setValue('OFF');
@@ -93,5 +92,11 @@ var unload = func (addon) {
 };
 
 var main = func (addon) {
+    globals.robocrew.addonPath = addon.basePath;
+    load_module('worker.nas');
+    load_module('crew.nas');
+    load_module('actions.nas');
+    load_module('job.nas');
+
     load_crew(subtype) or load_crew(type) or load_crew(family);
 };

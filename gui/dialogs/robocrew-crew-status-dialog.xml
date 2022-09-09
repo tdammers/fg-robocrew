@@ -47,6 +47,7 @@
                             var statusText = controlGroup.addChild('text');
                             statusText.setValue('live', 1);
                             statusText.setValue('halign', 'left');
+                            statusText.setValue('pref-width', 500);
                             statusText.setValue('property', status.getPath());
                             statusText.setValue('row', y);
                             statusText.setValue('col', 1);
