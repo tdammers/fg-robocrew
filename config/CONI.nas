@@ -35,6 +35,12 @@ controlProps.firstOfficer.v2.setValue('type', 'text');
 controlProps.firstOfficer.v2.setValue('input', '115');
 controlProps.firstOfficer.v2.setValue('status', 'OK');
 
+controlProps.firstOfficer.da = crewProps.firstOfficer.getNode('control[4]', 1);
+controlProps.firstOfficer.da.setValue('name', 'Decision Altitude');
+controlProps.firstOfficer.da.setValue('type', 'text');
+controlProps.firstOfficer.da.setValue('input', '400');
+controlProps.firstOfficer.da.setValue('status', 'OK');
+
 
 controlProps.flightEngineer.throttle = crewProps.flightEngineer.getNode('control[0]', 1);
 controlProps.flightEngineer.throttle.setValue('name', 'Throttle & Boost');
@@ -369,6 +375,28 @@ var setRPM = func (worker, targetRPM, pitchSetting) {
             }));
 };
 
+var speedByRPM = func (worker) {
+    # new: func (masterSwitchProp, targetProp, targetValue, outputProp, p, i=0, d=0, stepSize=nil, easeRate=1) {
+    worker.addJob(PropertyTargetJob.new(
+        controlProps.flightEngineer.rpm.getChild('input'),
+        '/instrumentation/airspeed-indicator/indicated-speed-kt',
+        func { return (getprop('/autopilot/route-manager/cruise/speed-kts') or 220) },
+        '/controls/engines/propeller-pitch-all',
+        0.001, 0.001, 0.01));
+    worker.addJob(
+        ReportingJob.new(
+            controlProps.flightEngineer.rpm,
+            func {
+                var report = sprintf("%3.0f", getprop('/autopilot/route-manager/cruise/speed-kts') or 220);
+                report ~= sprintf("[%3.0f]", getprop('/instrumentation/airspeed-indicator/indicated-speed-kt'));
+                for (var e = 0; e < 4; e +=1 ) {
+                    report ~= sprintf(" [%04.0f]",
+                        getprop('/engines/engine[' ~ e ~ ']/rpm'));
+                }
+                return report;
+            }));
+};
+
 var BlowerJob = {
     new: func (masterSwitchProp, e) {
         var m = BaseJob.new(masterSwitchProp);
@@ -513,6 +541,8 @@ climbCallouts = func (worker) {
 };
 
 landingCallouts = func (worker) {
+    var radioAltProp = props.globals.getNode('/position/altitude-agl-ft');
+    var baroAltProp = props.globals.getNode('/instrumentation/altimeter/indicated-altitude-ft');
     foreach (var alt; [1000, 500, 400, 300, 200, 100, 50, 40, 30, 20, 10])
         (func (alt) {
             worker.addJob(
@@ -520,10 +550,19 @@ landingCallouts = func (worker) {
                     controlProps.firstOfficer.callouts,
                     func (on) { if (on) callout(alt, alt ~ '.wav'); },
                     func {
-                        var current_alt = getprop('/position/altitude-agl-ft') - 8.25;
-                        return current_alt < alt + 5 and current_alt > alt - 5;
+                        var currentAlt = radioAltProp.getValue() - 8.25;
+                        return currentAlt < alt + 5 and currentAlt > alt - 5;
                     }));
         })(alt);
+    worker.addJob(
+        TriggerJob.new(
+            controlProps.firstOfficer.callouts,
+            func (on) { if (on) callout('Minimums!', 'minimums.wav'); },
+            func {
+                var currentAlt = baroAltProp.getValue() or 0;
+                var decisionAlt = controlProps.firstOfficer.da.getValue('input');
+                return currentAlt < decisionAlt + 5 and currentAlt > decisionAlt - 5;
+            }));
 };
 
 var manageFuel = func (worker, mode='CRUISE') {
@@ -624,14 +663,14 @@ var FlightEngineerMasterJob = {
             manageMixture(me, 1);
             maintainMP(me, 48);
             manageFuel(me, 'CRUISE');
-            setRPM(me, '2300', -0.2);
+            speedByRPM(me);
         }
         elsif (phase == 'DESCENT') {
             maintainCHT(me, 480);
             manageMixture(me, 0);
             maintainMP(me, nil);
             manageFuel(me, 'CRUISE');
-            setRPM(me, 'FULL FWD', -1);
+            setRPM(me, 'PILOTS HAVE CONTROL', nil);
         }
         elsif (phase == 'APPROACH' or phase == 'LANDING') {
             cowlFlapsFullOpen(me);
