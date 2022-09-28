@@ -78,6 +78,12 @@ controlProps.flightEngineer.electrical.setValue('type', 'checkbox');
 controlProps.flightEngineer.electrical.setValue('input', 1);
 controlProps.flightEngineer.electrical.setValue('status', 'OK');
 
+controlProps.flightEngineer.startEngines = crewProps.flightEngineer.getNode('control[6]', 1);
+controlProps.flightEngineer.startEngines.setValue('name', 'Start Engines');
+controlProps.flightEngineer.startEngines.setValue('type', 'button');
+controlProps.flightEngineer.startEngines.setValue('input', 0);
+controlProps.flightEngineer.startEngines.setValue('status', 'OFF');
+
 var FuelManagementJob = {
     new: func (commandProp, mode) {
         var m = BaseJob.new(commandProp.getChild('input'), commandProp.getChild('status'));
@@ -280,6 +286,70 @@ var FuelManagementJob = {
         }
         return result;
     },
+};
+
+var StartEnginesJob = {
+    new: func (commandProp) {
+        var m = BaseJob.new(commandProp.getChild('input'), commandProp.getChild('status'));
+        m.parents = [StartEnginesJob] ~ m.parents;
+        m.props = {};
+        m.props.engine = [];
+        for (var i = 0; i < 4; i += 1) {
+            append(m.props.engine, {
+                running: props.globals.getNode('/engines/engine[' ~ i ~ ']/running'),
+            });
+        }
+        m.props.starterSelect = props.globals.getNode('/controls/switches/engine-start-select');
+        m.props.starter = props.globals.getNode('/controls/switches/engine-start');
+        return m;
+    },
+
+    update: func {
+        if (me.props.starter.getBoolValue()) {
+            # Currently cranking: check if engine is now running.
+            var e = me.props.starterSelect.getValue() - 1;
+            if (e < 0) {
+                # No engine currently selected, stop pushing the starter.
+                props.starter.setBoolValue(0);
+            }
+            else {
+                var isRunning = me.props.engine[e].running.getBoolValue();
+                if (isRunning) {
+                    me.props.starter.setBoolValue(0);
+                }
+            }
+        }
+        else {
+            # Not cranking any engines. Find an engine that is not running; if
+            # one exists, start it, otherwise put starter select into "off"
+            # position.
+            var startOrder = [2, 3, 1, 0];
+            foreach (var e; startOrder) {
+                var isRunning = me.props.engine[e].running.getBoolValue();
+                if (!isRunning) {
+                    # This engine isn't running! Let's start it!
+                    me.props.starterSelect.setValue(e + 1);
+                    me.props.starter.setBoolValue(1);
+                    return;
+                }
+            }
+            # All engines seem to be running, so let's just put the selector
+            # in the neutral position.
+            me.props.starterSelect.setValue(0);
+            me.props.starter.setBoolValue(0);
+            me.masterSwitchProp.setBoolValue(0);
+        }
+    },
+
+    report: func {
+        var e = me.props.starterSelect.getValue();
+        var s = me.props.starter.getBoolValue();
+        if (e > 0)
+            return sprintf("START ENGINE #%i (%s)", e, s ? "CRANKING" : "WAIT");
+        else
+            return "ALL RUNNING";
+    },
+
 };
 
 var maintainMP = func (worker, targetMP) {
@@ -569,6 +639,11 @@ var manageFuel = func (worker, mode='CRUISE') {
     worker.addJob(FuelManagementJob.new(controlProps.flightEngineer.fuel, mode));
 };
 
+startEngines = func (worker) {
+    worker.addJob(
+        StartEnginesJob.new(controlProps.flightEngineer.startEngines));
+};
+
 setupElectrical = func (worker) {
     for (var e = 0; e < 4; e += 1) {
         worker.addJob(
@@ -636,13 +711,23 @@ var FlightEngineerMasterJob = {
     },
 
     loadJobs: func (phase) {
-        if (phase == 'PREFLIGHT' or phase == 'TAXI-OUT') {
+        if (phase == 'PREFLIGHT') {
             cowlFlapsFullOpen(me);
             manageMixture(me, 2);
             maintainMP(me, nil);
             manageFuel(me, 'TAKEOFF');
             setRPM(me, 'FULL FWD', -1.0);
             setupElectrical(me);
+            startEngines(me);
+        }
+        if (phase == 'TAXI-OUT') {
+            cowlFlapsFullOpen(me);
+            manageMixture(me, 2);
+            maintainMP(me, nil);
+            manageFuel(me, 'TAKEOFF');
+            setRPM(me, 'FULL FWD', -1.0);
+            setupElectrical(me);
+            startEngines(me);
         }
         elsif (phase == 'TAKEOFF') {
             cowlFlapsFullOpen(me);
@@ -650,6 +735,7 @@ var FlightEngineerMasterJob = {
             maintainMP(me, 56.5);
             manageFuel(me, 'TAKEOFF');
             setRPM(me, '2900', -0.95);
+            startEngines(me);
         }
         elsif (phase == 'CLIMB') {
             maintainCHT(me, 490);
@@ -657,6 +743,7 @@ var FlightEngineerMasterJob = {
             maintainMP(me, 48);
             manageFuel(me, 'CRUISE');
             setRPM(me, '2600', -0.6);
+            startEngines(me);
         }
         elsif (phase == 'CRUISE') {
             maintainCHT(me, 480);
@@ -664,6 +751,7 @@ var FlightEngineerMasterJob = {
             maintainMP(me, 48);
             manageFuel(me, 'CRUISE');
             speedByRPM(me);
+            startEngines(me);
         }
         elsif (phase == 'DESCENT') {
             maintainCHT(me, 480);
@@ -671,6 +759,7 @@ var FlightEngineerMasterJob = {
             maintainMP(me, nil);
             manageFuel(me, 'CRUISE');
             setRPM(me, 'PILOTS HAVE CONTROL', nil);
+            startEngines(me);
         }
         elsif (phase == 'APPROACH' or phase == 'LANDING') {
             cowlFlapsFullOpen(me);
@@ -678,8 +767,10 @@ var FlightEngineerMasterJob = {
             maintainMP(me, nil);
             manageFuel(me, 'LANDING');
             setRPM(me, 'FULL FWD', -1);
+            startEngines(me);
         }
         elsif (phase == 'TAXI-IN') {
+            startEngines(me);
         }
     },
 };

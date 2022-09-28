@@ -66,6 +66,24 @@
                         tb.setValue('col', 1);
                         tb.addChild('binding').setValue('command', 'dialog-apply');
                     }
+                    elsif (ty == 'button') {
+                        var btn = controlGroup.addChild('button');
+                        btn.setValue('legend', name);
+                        btn.setValue('row', y);
+                        btn.setValue('col', 0);
+                        var btnBinding = btn.addChild('binding');
+                        btnBinding.setValue('command', 'property-toggle');
+                        btnBinding.setValue('property', input.getPath());
+                        if (status != nil) {
+                            var statusText = controlGroup.addChild('text');
+                            statusText.setValue('live', 1);
+                            statusText.setValue('halign', 'left');
+                            statusText.setValue('pref-width', 500);
+                            statusText.setValue('property', status.getPath());
+                            statusText.setValue('row', y);
+                            statusText.setValue('col', 1);
+                        }
+                    }
                     y += 1;
                 })(control);
             }
